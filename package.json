@@ -1,0 +1,19 @@
+{
+  "name": "backend_package",
+  "version": "1.0.0",
+  "description": "a complete backend package to learn from!",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": " "
+  },
+  "keywords": [
+    "javascript",
+    "backend"
+  ],
+  "author": "\"Sulav Gairhe\"",
+  "license": "ISC"
+}
