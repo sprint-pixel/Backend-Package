@@ -33,4 +33,20 @@ const app=express()
 
 // METHOD NO.2 -> importing from db folder (keeping our index.js file clean.)
 import connectDB from './db/index.js';
+
+//it's a good practise to check for weeoe before connecitng our db.
+app.on("error",(err)=>{
+    console.log(`Error: ${err}`);
+    throw err;
+})
+
 connectDB()
+.then(()=>{
+    app.listen(process.env.PORT||8000,
+        console.log(`Server started at port ${process.env.PORT||8000}`)
+    )
+}) 
+.catch((err)=>{
+    console.log(`MongoDB connection failure: ${err}`);
+    process.exit(1)
+})
