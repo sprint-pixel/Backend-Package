@@ -21,6 +21,7 @@
 
 } */
 
+    //this is *TYPE-2*:PROMISE
 const asyncHandler=(func)=>{
     return (req,res,next)=>{ 
         Promise.resolve(func(req,res,next))
