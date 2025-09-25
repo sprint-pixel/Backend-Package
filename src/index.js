@@ -34,7 +34,7 @@ const app=express()
 // METHOD NO.2 -> importing from db folder (keeping our index.js file clean.)
 import connectDB from './db/index.js';
 
-//it's a good practise to check for weeoe before connecitng our db.
+//it's a good practise to check for app error early.
 app.on("error",(err)=>{
     console.log(`Error: ${err}`);
     throw err;
@@ -45,8 +45,13 @@ connectDB()
     app.listen(process.env.PORT||8000,
         console.log(`Server started at port ${process.env.PORT||8000}`)
     )
-}) 
+})
+
+//CHANGED-> 
+/* 
+The catch inside `index.js`-connectDB() already catches and exits the process if the process is faied. So no need for such redundant process in out `index.js`(src)
 .catch((err)=>{
     console.log(`MongoDB connection failure: ${err}`);
     process.exit(1)
 })
+    */
