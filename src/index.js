@@ -33,6 +33,7 @@ const app=express()
 
 // METHOD NO.2 -> importing from db folder (keeping our index.js file clean.)
 import connectDB from './db/index.js';
+import { app } from './app.js';
 
 //it's a good practise to check for app error early.
 app.on("error",(err)=>{
@@ -42,8 +43,7 @@ app.on("error",(err)=>{
 
 connectDB()
 .then(()=>{
-    app.listen(process.env.PORT||8000,
-        console.log(`Server started at port ${process.env.PORT||8000}`)
+    app.listen(process.env.PORT||5000,()=>{console.log(`🌐 Server started at port ${process.env.PORT||5000}`)}
     )
 })
 

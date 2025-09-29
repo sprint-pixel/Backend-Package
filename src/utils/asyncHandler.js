@@ -1,6 +1,7 @@
 //const asyncHandler = ()=>{}
 
 
+    //Higher Order functions be like:
 //const asyncHandler = () =>()
 //comst asyncHandler = (func) => () => {}
 //const asyncHandler = (func) => async () => {} 
@@ -28,3 +29,5 @@ const asyncHandler=(func)=>{
         .catch((err)=>next(err))
     }
 } 
+
+export {asyncHandler}
