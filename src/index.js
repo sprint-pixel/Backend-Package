@@ -39,7 +39,7 @@ import { app } from './app.js';
 app.on("error",(err)=>{
     console.log(`Error: ${err}`);
     throw err;
-})
+}) 
 
 connectDB()
 .then(()=>{

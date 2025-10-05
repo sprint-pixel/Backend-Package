@@ -9,11 +9,13 @@ function apiResponse(message, data = null) {
 }
 */
 //OR another approach using constructor
- class apiResponsee{
+ class apiResponse{
     constructor(statusCode,data,message="Success"){
         this.statusCode=statusCode,
-        this.data=data
-        this.message=message
+        this.message=message,
+        this.data=data,
         this.success= statusCode<400
     }
 }
+
+export {apiResponse}
