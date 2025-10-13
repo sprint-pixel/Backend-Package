@@ -1,4 +1,3 @@
-import { ServerMonitoringMode } from "mongodb";
 import mongoose, { mongo } from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
@@ -46,11 +45,11 @@ const userSchema= new mongoose.Schema({
 },{timestamps:true})
 
 
-//In order to encrypt our password Only when password feild is changed.
+//In order to encrypt our password Only when password field is changed.
 //the `pre` method allows us to add an middleware(some conditions) just before saving changes. 
 userSchema.pre("save",async function(next){
     if(this.isModified("password")){
-    this.password=bcrypt.hash(this.password,10)
+    this.password= bcrypt.hash(this.password, 10)
     next() //next() exits the procecss
     }
     //OR-Same thing
@@ -72,7 +71,7 @@ userSchema.methods.generateAccessToken= function(){
     jwt.sign({
         _id:this._id,
         email:this.email,
-        username:this.username,
+        username:this.userName,
         fullName:this.fullName
     },
 process.env.ACCESS_TOKEN_SECRET,{
@@ -88,4 +87,4 @@ userSchema.methods.generateRefreshToken=function(){
         expiresIn:process.env.REFRESH_TOKEN_EXPIRY
     })
 }
-export const User=mongoose.Types("User",userSchema)
+export const User=mongoose.model("User",userSchema)

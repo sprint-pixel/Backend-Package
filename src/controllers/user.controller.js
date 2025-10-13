@@ -1,6 +1,9 @@
 import { asyncHandler } from '../utils/asyncHandler.js'
 import {apiError} from "../utils/apiError.js"
 import { apiResponse } from '../utils/apiResponse.js'
+import { User } from '../models/user.model.js'
+import {uplooadOnCloudinary} from '../utils/cloudinary.js'
+import { apiResponse } from '../utils/apiResponse.js'
 
 const registerUser = asyncHandler(async (req,res)=>{
     /*
@@ -16,9 +19,10 @@ const registerUser = asyncHandler(async (req,res)=>{
     */
 
     const {fullName,email,userName,password}=req.body
-    console.log("Email: ",email);
+    console.log(`Email: ${email} & FullName: ${fullName}`);
 
     //2. Validation phasee: 
+    // Data Validation:
     //Type1: basic if-else check: Simple and eeasy to understand, 
 
     /*
@@ -30,7 +34,7 @@ const registerUser = asyncHandler(async (req,res)=>{
        }
     */
 
-    //Type 2: use of `some() method pros: reduced code redundancy,standard practise in workspace
+    //Type 2: use of `some()` method pros: reduced code redundancy,standard practise in workspace
     // cons:lacks detailed user feedback..
 
     /*
@@ -55,9 +59,59 @@ const registerUser = asyncHandler(async (req,res)=>{
        throw new apiError(406,`Missing feilds: ${emptyFeilds.join()}`)
     }
 
+    //Validating Emails-Regex method.
+    const emailRegex= /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+    if(!emailRegex.test(email)){
+        throw new apiError(400,"Invalid Email Format!")
+    }
+    
+    //3.Check if user already exists
+
+    const existingUser= await User.findOne({//checks if the user exists with the same email and userName through User which can access the database and $or is a valid mongoose operator 
+        $or:[{ email },{ userName }]
+    })
+    console.log("Registered User:",existingUser)
+    if(existingUser){
+        throw new apiError(409,"User Already exists with the same email/username")
+    }
+
+    //4.Check for images,avatar-handling images
+
+    //a. Uploading images....
+    const avatarLocalPath=req.files?.avatar[0]?.path;
+    const coverImageLocalPath=req.files?.converImage[0]?.path
+
+    //b.validating/checking
+    if(!avatarLocalPath){
+        throw new apiError(400,"Avatar Image is required.")
+    }
+    const avatar= await uplooadOnCloudinary(avatarLocalPath)
+    const coverImage= await uplooadOnCloudinary(coverImageLocalPath)
+
+    if(!avatar){
+        throw new apiError(400,"Avatar file is required.")
+    }
+    const user = await User.create({
+        fullName,
+        avatar:avatar.url,
+        coverImage:coverImage?.url || "",
+        email,
+        password,
+        userName:userName.toLowerCase()
+    })
+    
+    const createdUser = await User.findById(user._id).select(
+        "-password -refreshToken"  //wierd syntax ik!
+    )
+
+    if(!createdUser){
+        throw new apiError(500,"Something went wrong when registering the user")
+    }
+
 
     return res.status(201).json(
-        new apiResponse(201,{email},"User registred succesfully")
+        new apiResponse(200,createdUser,"User Registered Succesfully.")
     )
 })
 
