@@ -1,8 +1,9 @@
+//**IMP:This is a practise file for myself to understand the logic and code flow.It contains the working bug free code without all the comments and hassle. It is easy to read and understand** */
 import { apiError } from "../utils/apiError.js";
 import { apiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { User } from "../models/user.model.js";
-import { uplooadOnCloudinary } from "../utils/cloudinary.js";
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
 
 
 const testController= asyncHandler(async (req,res)=>{
@@ -43,8 +44,8 @@ const testController= asyncHandler(async (req,res)=>{
         throw new apiError(406,`Avatar is Required.`)
     }
     //5. upload them to cloudinary
-    const avatar= await uplooadOnCloudinary(avatarLocalPath)
-    const coverImage= coverImageLocalPath? await uplooadOnCloudinary(coverImageLocalPath) : null
+    const avatar= await uploadOnCloudinary(avatarLocalPath)
+    const coverImage= coverImageLocalPath? await uploadOnCloudinary(coverImageLocalPath) : null
     
     if(!avatar){
         throw new apiError(406,`Upload to cloudinary failed.`)
@@ -69,7 +70,6 @@ const testController= asyncHandler(async (req,res)=>{
 
     return res.status(201).json(new apiResponse(201,returnUser,`User Created Sucesfully!!`))
 
-   
-
-
 })
+
+export {testController}

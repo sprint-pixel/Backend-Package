@@ -2,7 +2,7 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import {apiError} from "../utils/apiError.js"
 import { apiResponse } from '../utils/apiResponse.js'
 import { User } from '../models/user.model.js'
-import {uplooadOnCloudinary} from '../utils/cloudinary.js'
+import {uploadOnCloudinary} from '../utils/cloudinary.js'
 
 
 const registerUser = asyncHandler(async (req,res)=>{
@@ -19,7 +19,7 @@ const registerUser = asyncHandler(async (req,res)=>{
     */
 
     const {fullName,email,userName,password}=req.body
-    console.log(`Email: ${email} & FullName: ${fullName}`);
+    console.log(`req.body:`,req.body)
 
     //2. Validation phasee: 
     // Data Validation:
@@ -80,18 +80,23 @@ const registerUser = asyncHandler(async (req,res)=>{
 
     //a. Uploading images....
     const avatarLocalPath=req.files?.avatar[0]?.path;
-    const coverImageLocalPath=req.files?.coverImage[0]?.path //getting imagees from the frontend
+    const coverImageLocalPath=req.files?.coverImage[0]?.path //this or → → →
+    /*if(req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length>0 ){
+        const coverImageLocalPath=req.files?.coverImage[0].path
+    }*/
+    console.log(`req.files Format:`,req.files)
 
     //b.validating/checking
     if(!avatarLocalPath){
-        throw new apiError(400,"Avatar Image is required.")
+        throw new apiError(400,"Avatar Image is required!")
     }
+    
     //5. Uploading them to Cloudinary
-    const avatar= await uplooadOnCloudinary(avatarLocalPath)
-    const coverImage= coverImageLocalPath? await uplooadOnCloudinary(coverImageLocalPath) : null;
+    const avatar= await uploadOnCloudinary(avatarLocalPath)
+    const coverImage= uploadOnCloudinary(coverImageLocalPath);
 
     if(!avatar){
-        throw new apiError(400,"Avatar file is required.")
+        throw new apiError(400,"Avatar file is required-> Upload on cloudinary failed.")
     }
     //6. Createe a DB call and add to DB
     const user = await User.create({
@@ -111,6 +116,7 @@ const registerUser = asyncHandler(async (req,res)=>{
     if(!createdUser){
         throw new apiError(500,"Something went wrong when registering the user")
     }
+    console.log("The User Data is: ",createdUser)
 
 
     //9.return response
