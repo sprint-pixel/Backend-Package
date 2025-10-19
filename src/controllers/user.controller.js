@@ -5,6 +5,23 @@ import { User } from '../models/user.model.js'
 import {uploadOnCloudinary} from '../utils/cloudinary.js'
 
 
+const generateAccessAndRefreshToken= async(userId)=>{
+    try{
+        const user = await User.findById(userId)
+        const accessToken= user.generateAccessToken();
+        const refreshToken= user.generateRefreshToken();
+        
+        user.refreshToken=refreshToken;
+        await user.save({validateBeforeSave:false})
+
+        return {accessToken,refreshToken}
+
+    }
+    catch(err){
+        throw new apiError(500,"Something went wrong while generating refresh and access token")
+    }
+}
+
 const registerUser = asyncHandler(async (req,res)=>{
     /*
     1. Input email id and create a new password from frontend
@@ -125,4 +142,85 @@ const registerUser = asyncHandler(async (req,res)=>{
     )
 })
 
-export{registerUser}
+const loginUser =  asyncHandler( async (req,res)=>{
+    //1.input email/username and password || OR sign in through google api
+    //2. validate email format-regex method 
+    //3. check if user exists or not 
+    //4. check password with the DB
+    //5. if right, genarate access token and refresh token 
+    //6. send to the user through  secure Cookies  
+    //7. go to another interface and provide the validation code to check if it matches up 
+    //8. if matched, grant the user access; else: print error.
+
+    //1.get input
+    const {email,password,userName}=req.body;
+
+    if(!userName && !email){
+        throw new apiError(406,"Either Email or Username is required.")
+    }
+    if(!password){
+        throw new apiError(406,"Password is required.")
+    }
+    console.log(req.body)
+    
+    //2. 
+    const emailRegex2=/^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (emailRegex2.test(email)) {
+        throw new apiError(406,"Email format not correct")
+        
+    }
+    //3. 
+     const findUser= await User.findOne({
+        $or:[{email},{userName}]
+     })
+     if(!findUser){
+        throw new apiError(400,"User dosen't exist with the same Username|email.")
+     }
+
+     console.log("the findUser Mehtod returns: ",findUser)
+     //4.
+     const isPasswordValid= await findUser.isPasswordCorrect(password); //the `isPasswordCorrect()` method is inside of our user.model.js which is returned by the instance of `findUser` in out DB.
+     if(!isPasswordValid){
+        throw new apiError(401,"Password isn't correct."); 
+     }
+     //5.
+     const {accessToken,refreshToken} = await generateAccessAndRefreshToken(findUser._id);
+
+     const loggedInUser = User.findById(findUser._id).select("-password -refreshToken");
+
+     const options = {
+        httpOnly:true,
+        secure:true, //these 2 method allows the cookies to be modified only from the backend-by defualt it could be modified by anyone on the frontend.
+     }
+     return res
+     .status(200)
+     .cookie("accessToken",accessToken,options)
+     .cookie("refreshToken",refreshToken,options)
+     .json(
+        new apiResponse(200,{
+            user: loggedInUser,accessToken,refreshToken
+        },"User logged in sucessfully.")
+     )
+     
+
+})
+
+const logoutUser = asyncHandler(async (req,res)=>{
+   await User.findByIdAndUpdate(req.user._id,{
+        $set:{refreshToken:undefined}
+    },{
+        new:true,
+    })
+
+    const uptions={
+        httpOnly:true,
+        secure:true
+    }
+
+    return res.status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new apiResponse(200,{},"User logged Out Sucessfully"))
+
+})
+export{registerUser,loginUser,logoutUser}
