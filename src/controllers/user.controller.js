@@ -3,6 +3,7 @@ import {apiError} from "../utils/apiError.js"
 import { apiResponse } from '../utils/apiResponse.js'
 import { User } from '../models/user.model.js'
 import {uploadOnCloudinary} from '../utils/cloudinary.js'
+import jwt from "jsonwebtoken";
 
 
 const generateAccessAndRefreshToken= async(userId)=>{
@@ -88,7 +89,7 @@ const registerUser = asyncHandler(async (req,res)=>{
     const existingUser= await User.findOne({//checks if the user exists with the same email and userName through User which can access the database and $or is a valid mongoose operator 
         $or:[{ email },{ userName }]
     })
-    console.log("Registered User:",existingUser)
+    console.log("Existing User?`:",existingUser)
     if(existingUser){
         throw new apiError(409,"User Already exists with the same email/username")
     }
@@ -164,11 +165,14 @@ const loginUser =  asyncHandler( async (req,res)=>{
     console.log(req.body)
     
     //2. 
-    const emailRegex2=/^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (emailRegex2.test(email)) {
-        throw new apiError(406,"Email format not correct")
-        
+    if(!userName){
+    const emailRegex= /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+    if(!emailRegex.test(email)){
+        throw new apiError(400,"Invalid Email Format!")
     }
+    }
+    
     //3. 
      const findUser= await User.findOne({
         $or:[{email},{userName}]
@@ -177,7 +181,7 @@ const loginUser =  asyncHandler( async (req,res)=>{
         throw new apiError(400,"User dosen't exist with the same Username|email.")
      }
 
-     console.log("the findUser Mehtod returns: ",findUser)
+     console.log("the findUser Mehtod returns: ",findUser)  
      //4.
      const isPasswordValid= await findUser.isPasswordCorrect(password); //the `isPasswordCorrect()` method is inside of our user.model.js which is returned by the instance of `findUser` in out DB.
      if(!isPasswordValid){
@@ -186,7 +190,7 @@ const loginUser =  asyncHandler( async (req,res)=>{
      //5.
      const {accessToken,refreshToken} = await generateAccessAndRefreshToken(findUser._id);
 
-     const loggedInUser = User.findById(findUser._id).select("-password -refreshToken");
+     const loggedInUser = await User.findById(findUser._id).select("-password -refreshToken");
 
      const options = {
         httpOnly:true,
@@ -212,7 +216,7 @@ const logoutUser = asyncHandler(async (req,res)=>{
         new:true,
     })
 
-    const uptions={
+    const options={
         httpOnly:true,
         secure:true
     }
@@ -223,4 +227,42 @@ const logoutUser = asyncHandler(async (req,res)=>{
     .json(new apiResponse(200,{},"User logged Out Sucessfully"))
 
 })
-export{registerUser,loginUser,logoutUser}
+
+const refreshAccessToken = asyncHandler(async (req,res)=>{
+    const userStoredRefreshToken= req.cookies.refreshToken || req.body.refreshToken;
+
+    if(!userStoredRefreshToken){
+        throw new apiError(401,"Unathorized Request(No refresh Token detected in the system)w")
+    }
+  try { //QUESTION: why was try catch used here? In the jwt.verify? why ? Wouldn'tt we be fine without it ? 
+        //QUESTION: what does `decodedToken` return here? Yes it does return the user but how ? 
+     const decodedToken = jwt.verify(
+      userStoredRefreshToken,
+      process.env.REFRESH_TOKEN_SECRET)
+  
+      const user=await User.findById(decodedToken?._id)
+  
+      if(!user){
+          throw new apiError(401,"Invalid Refresh Token") 
+      }
+  
+      if(userStoredRefreshToken !== user?.refreshToken ){
+          throw new apiError(401,"Refresh token is expired or used")
+      }
+  
+      const options={
+          httpOnly:true,
+          secure:true
+      }
+     const {accessToken,newRefreshToken}= await generateAccessAndRefreshToken(user._id)
+      
+      return res.status(200).cookies("accessToken",accessToken,options).cookie("refreshToken",newRefreshToken,options).json(
+          new apiResponse(200,{accessToken, refreshToken: newRefreshToken},"Access token refreshed successfully")
+      )
+  } catch (error) {
+    throw new apiError(401,error?.message || "Invalid Refresh Token")
+  }
+
+
+})
+export{registerUser,loginUser,logoutUser,refreshAccessToken}

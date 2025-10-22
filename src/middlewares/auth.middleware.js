@@ -1,8 +1,8 @@
 //purpose:to verify if user exists or not
 import { apiError } from "../utils/apiError.js";
-import { asyncHandler } from "../utils/asyncHandler";
+import { asyncHandler } from "../utils/asyncHandler.js";
 import jwt from "jsonwebtoken"
-import { User } from "../models/user.model";
+import { User } from "../models/user.model.js";
 
 
 export const verifyJWT = asyncHandler(async (req,_,next)=>{ //the `res` wasn't used so wew can replace it with `_`
@@ -13,6 +13,7 @@ export const verifyJWT = asyncHandler(async (req,_,next)=>{ //the `res` wasn't u
         }
     
         const decodedToken = jwt.verify(token,process.env.ACCESS_TOKEN_SECRET)
+        console.log("the decoded TOKEN is :", decodedToken)
     
         const user = await User.findById(decodedToken?._id).select("-password -refreshToken")
         if(!user){
