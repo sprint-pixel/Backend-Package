@@ -232,10 +232,9 @@ const refreshAccessToken = asyncHandler(async (req,res)=>{
     const userStoredRefreshToken= req.cookies.refreshToken || req.body.refreshToken;
 
     if(!userStoredRefreshToken){
-        throw new apiError(401,"Unathorized Request(No refresh Token detected in the system)w")
+        throw new apiError(401,"Unathorized Request(No refresh Token detected in the system)")
     }
-  try { //QUESTION: why was try catch used here? In the jwt.verify? why ? Wouldn'tt we be fine without it ? 
-        //QUESTION: what does `decodedToken` return here? Yes it does return the user but how ? 
+  try { 
      const decodedToken = jwt.verify(
       userStoredRefreshToken,
       process.env.REFRESH_TOKEN_SECRET)
@@ -256,8 +255,14 @@ const refreshAccessToken = asyncHandler(async (req,res)=>{
       }
      const {accessToken,newRefreshToken}= await generateAccessAndRefreshToken(user._id)
       
-      return res.status(200).cookies("accessToken",accessToken,options).cookie("refreshToken",newRefreshToken,options).json(
-          new apiResponse(200,{accessToken, refreshToken: newRefreshToken},"Access token refreshed successfully")
+      return res.status(200)
+      .cookie("accessToken",accessToken,options)
+      .cookie("refreshToken",newRefreshToken,options)
+      .json(
+          new apiResponse(
+            200,
+            {accessToken, refreshToken: newRefreshToken},
+            "Access token refreshed successfully")
       )
   } catch (error) {
     throw new apiError(401,error?.message || "Invalid Refresh Token")

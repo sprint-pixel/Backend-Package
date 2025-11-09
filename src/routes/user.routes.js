@@ -24,7 +24,7 @@ router.route("/login").post(loginUser)
 
 //secured Routes-only when loggedIn
 
-router.route("/logout").post(verifyJWT,logoutUser)
+router.route("/logout").post(verifyJWT/*->middleware*/ ,logoutUser)
 router.route("/refresh-token").post(refreshAccessToken)
 
 export default router
