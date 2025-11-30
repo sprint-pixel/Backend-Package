@@ -232,7 +232,7 @@ const refreshAccessToken = asyncHandler(async (req,res)=>{
     const userStoredRefreshToken= req.cookies.refreshToken || req.body.refreshToken;
 
     if(!userStoredRefreshToken){
-        throw new apiError(401,"Unathorized Request(No refresh Token detected in the system)")
+        throw new apiError(401,"Unathorized Request(No refresh Token detected)")
     }
   try { 
      const decodedToken = jwt.verify(
@@ -268,6 +268,20 @@ const refreshAccessToken = asyncHandler(async (req,res)=>{
     throw new apiError(401,error?.message || "Invalid Refresh Token")
   }
 
+
+})
+
+const changeCurrentPassword = asyncHandler(async (req,res)=>{
+    const {oldPassword,newPassword}=req.body;
+
+    const user = User.findById(req.user?.id)
+    const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
+
+    if(!isPasswordCorrect){
+        throw new apiError(400, "Invalid password")
+    }
+    user.password=newPassword;
+    await user.save({validateBeforeSave:false})
 
 })
 export{registerUser,loginUser,logoutUser,refreshAccessToken}

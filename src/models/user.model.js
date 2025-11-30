@@ -55,9 +55,8 @@ userSchema.pre("save", async function (next) {
 });
 
 
-//the `bcrypt.compare()` compares and returns true/false. And since it's gonna take some time we use await.
+//the `bcrypt.compare()` compares and returns true/false.
 userSchema.methods.isPasswordCorrect = async function(password){
-      console.log(`The password is: ${password} & this.password is: ${this.password}`)
     return await bcrypt.compare(password, this.password)
 }
 
