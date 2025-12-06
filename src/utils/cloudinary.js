@@ -19,17 +19,14 @@ const uploadOnCloudinary = async (localFilePath) => {
       console.error("Local file path not provided.");
       return null;
     }
-
     // Upload file to Cloudinary
     const result = await cloudinary.uploader.upload(localFilePath, {
       resource_type: "auto",
     });
-
     console.log(`✅ File uploaded to cloudinary successfully: ${result.url}`);
     
     //delete local file after successful upload
     fs.unlinkSync(localFilePath);
-
     return result;
   } catch (error) {
     console.error("❌ Cloudinary upload failed:", error.message);
@@ -43,4 +40,19 @@ const uploadOnCloudinary = async (localFilePath) => {
   }
 };
 
-export { uploadOnCloudinary };
+const deleteFromCloudinary = async (publicId) => {
+  try {
+    if(!publicId){
+    console.error("Public ID not provided for deletion of file.");
+    return null;
+  }
+    const result = await cloudinary.uploader.destroy(publicId,{invalidate:false})
+    return result
+  }
+  catch(error){
+    console.error("❌ Cloudinary deletion failed:", error.message);
+    return null;
+  }
+}
+
+export { uploadOnCloudinary, deleteFromCloudinary };
