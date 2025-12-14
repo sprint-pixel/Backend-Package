@@ -347,7 +347,7 @@ const  updateUserAvatar = asyncHandler(async(req, res)=>{
         throw new apiError(400,"Error while uploading Avatar on cloudinary")
     }
 
-    if(user.avatarPublicId){  //for first time usecase
+    if(user.avatarPublicId){  //for first time usecase-the IF condition will be false
         const deleteAvatarImage = await deleteFromCloudinary(user.avatarPublicId);
         console.log("Avatar deletion successful:", deleteAvatarImage);
     }
@@ -390,6 +390,78 @@ const  updateUserCoverImage = asyncHandler(async(req, res)=>{
         new apiResponse(200,user,"User Cover Image updated successfully.")
     )
 })
+
+const getUserChannelProfile = asyncHandler(async(req, res)=>{
+    const {userName}= req.params
+
+    if(!userName?.toLowerCase()){
+        throw new apiError(400,"Invalid Username found")
+    }
+
+    const channel= await User.aggregate([
+        {
+            $match:{
+                userName:this.userName?.toLowerCase()
+            }
+        },
+        {
+            $lookup:{                   //connect user(_id) in the channel docs for each
+                from:"subscription",         //`channel` field for finding number of 
+                localField:"_id",            //subscriber of a particular Channel(User).
+                foreignField:"channel",
+                as:"subscribers"
+            }
+        },
+        {
+            $lookup:{                         //connect user(_id) in the subscriber docs
+                from:"subscription",           //for each `subsciber` field for
+                localField:"_id",               //finding the number of channel
+                foreignField:"subscriber",       //Channel(User) is subscribed TO
+                as:"subscribedTo"
+            }
+        },
+        {
+            $addFields:{
+                subscriberCount:{                 //used to add number of `$channel`
+                    $size: "$subscribers"         //one by one.`$subscribers`→`$channel`
+                },
+                channelsSubscribedToCount:{      //used to add number of `channel` a  channel itself is subscribed to. The above comment is of the actual mechanism of `$size` while it explains the ABSTRACTION of the feild.
+                    $size: "$subscribedTo"      
+                },
+                isSubscribed:{
+                    $cond: {
+                        if:{$in:[req.user?._id,"$subscribers.subscriber"]}, //IF User 
+                        then:true,       //is in the subscriber list. It looks through
+                        else:false       //the subscriber list of a particular channel.
+                    }                    //if true: Frontend guy does `SUBSCRIBED 🛎️`
+                }                        //if false: Frontend guy does `SUBSCRIBE🔔`
+            }
+        },
+        {
+            $project:{
+                fullName: 1,
+                userName: 1,
+                avatar: 1,
+                coverImage: 1,
+                email: 1,
+                subscriberCount: 1,
+                channelsSubscribedToCount: 1,
+            }
+        }
+    ])
+
+    if(!channel?.length){
+        throw new apiError(404,"Channel does not exist")
+    }
+
+    return res
+    .status(200)
+    .json(
+        new apiResponse(200,channel[0],"User Channel Fetched Succefully.")
+    )
+    
+
+})
 export{
     registerUser,
     loginUser,
@@ -399,5 +471,6 @@ export{
     getCurrentUser,
     updateAccountDetails,
     updateUserAvatar,
-    updateUserCoverImage
+    updateUserCoverImage,
+    getUserChannelProfile
 }
