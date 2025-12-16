@@ -4,6 +4,7 @@ import { apiResponse } from '../utils/apiResponse.js'
 import { User } from '../models/user.model.js'
 import {deleteFromCloudinary, uploadOnCloudinary} from '../utils/cloudinary.js'
 import jwt from "jsonwebtoken";
+import mongoose from 'mongoose'
 
 
 const generateAccessAndRefreshToken= async(userId)=>{
@@ -395,7 +396,7 @@ const getUserChannelProfile = asyncHandler(async(req, res)=>{
     const {userName}= req.params
 
     if(!userName?.toLowerCase()){
-        throw new apiError(400,"Invalid Username found")
+        throw new apiError(400,"Invalid Username")
     }
 
     const channel= await User.aggregate([
@@ -416,7 +417,7 @@ const getUserChannelProfile = asyncHandler(async(req, res)=>{
             $lookup:{                         //connect user(_id) in the subscriber docs
                 from:"subscription",           //for each `subsciber` field for
                 localField:"_id",               //finding the number of channel
-                foreignField:"subscriber",       //Channel(User) is subscribed TO
+                foreignField:"subscriber",       //the Channel(User) is subscribed TO
                 as:"subscribedTo"
             }
         },
@@ -462,6 +463,56 @@ const getUserChannelProfile = asyncHandler(async(req, res)=>{
     
 
 })
+
+const getWatchHistory = asyncHandler(async(req,res)=>{
+    const user = await User.aggregate([
+        {
+            $match:{
+                _id: req.user?._id      
+            }
+        },
+        {
+            $lookup:{
+                from:"videos",
+                localField:"watchHistory",
+                foreignField:"_id",
+                as:"watchHistory",
+                pipeline:[   //used to add another pipeline inside a existing pipeline. `populate` is a option too
+                    {    
+                        $lookup:{
+                            from:"users",
+                            localField:"owner",
+                            foreignField:"_id",
+                            as:"owner",
+                            pipeline:[
+                                {
+                                    $project:{
+                                        userName:1,
+                                        fullName:1,
+                                        avatar:1  
+                                    }
+                                }
+                            ]
+                        },
+                    },
+                    {
+                        $addFields:{
+                            owner:{
+                                 $first:"$owner", //to convert the owner array to object.Gets the first element of the array -Frontend guy will get appreciate it.
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ])
+
+    return res
+    .status(200)
+    .json(
+        new apiResponse(200,user[0].watchHistory,"Watch History fetched successfully.")
+    )
+})
 export{
     registerUser,
     loginUser,
@@ -472,5 +523,6 @@ export{
     updateAccountDetails,
     updateUserAvatar,
     updateUserCoverImage,
-    getUserChannelProfile
+    getUserChannelProfile,
+    getWatchHistory 
 }
