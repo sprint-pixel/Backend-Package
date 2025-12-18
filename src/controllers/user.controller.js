@@ -225,7 +225,10 @@ const loginUser =  asyncHandler( async (req,res)=>{
 
 const logoutUser = asyncHandler(async (req,res)=>{
    await User.findByIdAndUpdate(req.user._id,{
-        $set:{refreshToken:undefined}
+        // $set:{refreshToken:undefined}
+        $unset:{
+            refreshToken:1  //this removes the refreshToken feild from the document.
+        }
     },{
         new:true,
     })
@@ -402,22 +405,24 @@ const getUserChannelProfile = asyncHandler(async(req, res)=>{
     const channel= await User.aggregate([
         {
             $match:{
-                userName:this.userName?.toLowerCase()
+                userName:userName?.toLowerCase()
             }
         },
         {
-            $lookup:{                   //connect user(_id) in the channel docs for each
-                from:"subscription",         //`channel` field for finding number of 
-                localField:"_id",            //subscriber of a particular Channel(User).
-                foreignField:"channel",
+            //initially empty but will contain the list of subscribers and channel. For eg: `user.model.js` → { _id: ObjectId("sub001"), subscriber: ObjectId("user_john"), channel: ObjectId("user_chaiAurCode")}
+            
+            $lookup:{                   //connect user(_id) in the channel docs
+                from:"subscriptions",        //`channel` feild for finding the number of subscribers
+                localField:"_id",            
+                foreignField:"channel", //loook for _id in the `channel` feild of `subscriptions` collection. 
                 as:"subscribers"
             }
         },
         {
             $lookup:{                         //connect user(_id) in the subscriber docs
-                from:"subscription",           //for each `subsciber` field for
-                localField:"_id",               //finding the number of channel
-                foreignField:"subscriber",       //the Channel(User) is subscribed TO
+                from:"subscriptions",           //`subscriber` feild for finding the number of channels, a particular channel is subscribed to.
+                localField:"_id",               
+                foreignField:"subscriber",      //look for _id in the `subscriber` feild of `subscriptions` collection.
                 as:"subscribedTo"
             }
         },
@@ -475,7 +480,7 @@ const getWatchHistory = asyncHandler(async(req,res)=>{
             $lookup:{
                 from:"videos",
                 localField:"watchHistory",
-                foreignField:"_id",
+                foreignField:"_id",             //search for the particular _id in the array of watchHistory in the `videos` collection.
                 as:"watchHistory",
                 pipeline:[   //used to add another pipeline inside a existing pipeline. `populate` is a option too
                     {    
