@@ -4,6 +4,8 @@ import { apiResponse } from "../utils/apiResponse"
 import { apiError } from "../utils/apiError.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
 import { Video } from "../models/video.model.js"
+import { User } from "../models/user.model.js"
+import { Timestamp } from "mongodb"
     
 const getVideoComments = asyncHandler(async (req, res) => {
     //TODO: get all comments for a video
@@ -90,8 +92,8 @@ const getVideoComments = asyncHandler(async (req, res) => {
 
     const result = await Comment.aggregatePaginate(comments, options)
 
-   if(!result || result.docs.length === 0){
-    throw new apiError(404, "No comments found for this video")
+   if(!result ){
+    throw new apiError(404, "Error while fetching comments")
    }
 
    return res.status(200).json(new apiResponse(200,result,"Comments fetched successfully"))
@@ -102,11 +104,75 @@ const getVideoComments = asyncHandler(async (req, res) => {
 })
 
 const addComment = asyncHandler(async (req, res) => {
-    // TODO: add a comment to a video
+
+    const { videoId }= req.params;
+    const { _id } = req.user;
+    const { content } = req.body;
+
+    if(content.trim()==""){
+        throw new apiError("400", "Comment cannot be empty");
+    }
+
+    if( !(await Video.findById(videoId))){
+        throw new apiError(404, "Video not found");
+    }
+
+    const user = await User.findById(_id);  //Since the verifyJWT already checks if the user checks exists or not. This check is redundant
+
+    if(!user){
+        throw new apiError(400,"User dosen't exist")
+    }
+
+    const comment = await Comment.create({
+        content:content,
+        video: videoId,
+        owner: _id
+    })
+
+    if(!comment){
+        throw new apiError(500, "Error while adding comment");
+    }
+
+    return res.status(201).json(new apiResponse(201, comment, "Comment added successfully"));
+
 })
 
 const updateComment = asyncHandler(async (req, res) => {
-    // TODO: update a comment
+    const {commentId} = req.params;
+    const {videoId} = req.params;
+    const {_id} = req.user;
+    const {newContent} = req.body;
+
+    if(!mongoose.isValidObjectId(commentId) || !commentId){
+        throw new apiError(400, "Invalid comment id")
+    }
+
+    const Comment = await Comment.findById(commentId)
+    if(!Comment){
+        throw new apiError(404,"Comment dosen't exists.")
+    }
+
+    if(!(await Video.findById(videoId) ) ){
+        throw new apiError(404,"Video dosen't exists, Sorry")
+    }
+
+    //we also need to check if the comment being updated was writtend by the same user or not- else any user can update any comment
+    if(Comment?.owner.toString() !== _id.toString()){
+        throw new apiError(403, "You are not authorized to update this comment")
+    }
+
+    //don't need to check if user exists or not ;as it is done by the middleware
+
+    const comment = await Comment.findByIdAndUpdate(commentId, {
+        content: newContent
+    },{new :true})
+
+    if(!comment){
+        throw new apiError(500, "Error while updating comment")
+    }
+
+    return res.status(200).json(new apiResponse(200, comment , "Comment updated successfully"))
+
 })
 
 const deleteComment = asyncHandler(async (req, res) => {
