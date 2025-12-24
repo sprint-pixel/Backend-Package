@@ -1,187 +1,212 @@
-import mongoose from "mongoose"
-import {Comment} from "../models/comment.model.js"
-import { apiResponse } from "../utils/apiResponse"
-import { apiError } from "../utils/apiError.js"
-import {asyncHandler} from "../utils/asyncHandler.js"
-import { Video } from "../models/video.model.js"
-import { User } from "../models/user.model.js"
-import { Timestamp } from "mongodb"
-    
-const getVideoComments = asyncHandler(async (req, res) => {
-    //TODO: get all comments for a video
-    const {videoId} = req.params
-    if(!mongoose.isValidObjectId(videoId) || !videoId){
-        throw new apiError(400, "Invalid video id")
-    }
+    import mongoose from "mongoose"
+    import {Comment} from "../models/comment.model.js"
+    import { apiResponse } from "../utils/apiResponse"
+    import { apiError } from "../utils/apiError.js"
+    import {asyncHandler} from "../utils/asyncHandler.js"
+    import { Video } from "../models/video.model.js"
+    import { User } from "../models/user.model.js"
+    import { Timestamp } from "mongodb"
+        
+    const getVideoComments = asyncHandler(async (req, res) => {
+        //TODO: get all comments for a video
+        const {videoId} = req.params
+        if(!mongoose.isValidObjectId(videoId) || !videoId){
+            throw new apiError(400, "Invalid video id")
+        }
 
-    const video = await Video.findById(videoId)
-    if(!video){
-        throw new apiError(404, "Video not found")
-    }
+        const video = await Video.findById(videoId)
+        if(!video){
+            throw new apiError(404, "Video not found")
+        }
 
-    
-     const comments =  Comment.aggregate([
-        {
-            $match: {
-                video: new mongoose.Types.ObjectId(videoId),
-            }
-        },
-        {
-            $lookup: {
-                from: "videos",
-                localField: "video",
-                foreignField: "_id",
-                as: "videoDetails",
-                pipeline: [
-                    {
-                        $lookup: {                      //to pass in full owner details while connecting the video
-                            from: "users",
-                            localField: "owner",
-                            foreignField: "_id",
-                            as: "ownerDetails",
-                            pipeline: [
-                                {
-                                    $project: {              //Can't pass Sensitive info
-                                        fullName: 1,
-                                        username: 1,
-                                        avatar: 1
+        
+        const comments =  Comment.aggregate([
+            {
+                $match: {
+                    video: new mongoose.Types.ObjectId(videoId),
+                }
+            },
+            {
+                $lookup: {
+                    from: "videos",
+                    localField: "video",
+                    foreignField: "_id",
+                    as: "videoDetails",
+                    pipeline: [
+                        {
+                            $lookup: {                      //to pass in full owner details while connecting the video
+                                from: "users",
+                                localField: "owner",
+                                foreignField: "_id",
+                                as: "ownerDetails",
+                                pipeline: [
+                                    {
+                                        $project: {              //Can't pass Sensitive info
+                                            fullName: 1,
+                                            username: 1,
+                                            avatar: 1
+                                        }
                                     }
-                                }
-                            ]
+                                ]
+                            },
                         },
-                    },
-                    {
-                        $addFields: {
-                                        ownerDetails: { $first: "$ownerDetails" } //We put this here(I had prev assigned it in the User model nested pipeline) becuase of scope issues. The `owneerDetails` field belongs to the `Video` model not the `User` model , thus it can't be accessible there.
-                        } 
-                    }
-                ],
-            }
-        },
-        {
-            $lookup: {
-                from: "users",
-                localField: "owner",
-                foreignField: "_id",
-                as: "ownerDetails",
-                pipeline: [
-                    {
-                        $lookup: {
-                            from: "videos",
-                            localField: "watchHistory",
-                            foreignField: "_id",
-                            as: "watchHistoryDetails",
+                        {
+                            $addFields: {
+                                            ownerDetails: { $first: "$ownerDetails" } //We put this here(I had prev assigned it in the User model nested pipeline) becuase of scope issues. The `owneerDetails` field belongs to the `Video` model not the `User` model , thus it can't be accessible there.
+                            } 
                         }
-                    },
-                    {
-                        $addFields: {
-                            watchHistoryDetails: { $first: "$watchHistoryDetails" }
+                    ],
+                }
+            },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "owner",
+                    foreignField: "_id",
+                    as: "ownerDetails",
+                    pipeline: [
+                        {
+                            $lookup: {
+                                from: "videos",
+                                localField: "watchHistory",
+                                foreignField: "_id",
+                                as: "watchHistoryDetails",
+                            }
+                        },
+                        {
+                            $addFields: {
+                                watchHistoryDetails: { $first: "$watchHistoryDetails" }
+                            }
                         }
-                    }
-                ]
-            }
-        },            
-    ])
+                    ]
+                }
+            },            
+        ])
 
-    const {page = 1, limit = 10} = req.query
-    
-    const options = {
-        page: parseInt(page) || 1,
-        limit: parseInt(limit) || 10,
-    }
+        const {page = 1, limit = 10} = req.query
+        
+        const options = {
+            page: parseInt(page) || 1,
+            limit: parseInt(limit) || 10,
+        }
 
-    const result = await Comment.aggregatePaginate(comments, options)
+        const result = await Comment.aggregatePaginate(comments, options)
 
-   if(!result ){
-    throw new apiError(404, "Error while fetching comments")
-   }
+        if(!result ){
+            throw new apiError(404, "Error while fetching comments")
+        }
 
-   return res.status(200).json(new apiResponse(200,result,"Comments fetched successfully"))
+        return res.status(200).json(new apiResponse(200,result,"Comments fetched successfully"))
+        
 
-
-    
-
-})
-
-const addComment = asyncHandler(async (req, res) => {
-
-    const { videoId }= req.params;
-    const { _id } = req.user;
-    const { content } = req.body;
-
-    if(content.trim()==""){
-        throw new apiError("400", "Comment cannot be empty");
-    }
-
-    if( !(await Video.findById(videoId))){
-        throw new apiError(404, "Video not found");
-    }
-
-    const user = await User.findById(_id);  //Since the verifyJWT already checks if the user checks exists or not. This check is redundant
-
-    if(!user){
-        throw new apiError(400,"User dosen't exist")
-    }
-
-    const comment = await Comment.create({
-        content:content,
-        video: videoId,
-        owner: _id
     })
 
-    if(!comment){
-        throw new apiError(500, "Error while adding comment");
-    }
+    const addComment = asyncHandler(async (req, res) => {
 
-    return res.status(201).json(new apiResponse(201, comment, "Comment added successfully"));
+        const { videoId }= req.params;
+        const { _id } = req.user;
+        const { content } = req.body;
 
-})
+        if(content.trim()==""){
+            throw new apiError("400", "Comment cannot be empty");
+        }
 
-const updateComment = asyncHandler(async (req, res) => {
-    const {commentId} = req.params;
-    const {videoId} = req.params;
-    const {_id} = req.user;
-    const {newContent} = req.body;
+        if( !(await Video.findById(videoId))){
+            throw new apiError(404, "Video not found");
+        }
 
-    if(!mongoose.isValidObjectId(commentId) || !commentId){
-        throw new apiError(400, "Invalid comment id")
-    }
+        const user = await User.findById(_id);  //Since the verifyJWT already checks if the user checks exists or not. This check is redundant
 
-    const Comment = await Comment.findById(commentId)
-    if(!Comment){
-        throw new apiError(404,"Comment dosen't exists.")
-    }
+        if(!user){
+            throw new apiError(400,"User dosen't exist")
+        }
 
-    if(!(await Video.findById(videoId) ) ){
-        throw new apiError(404,"Video dosen't exists, Sorry")
-    }
+        const comment = await Comment.create({
+            content:content,
+            video: videoId,
+            owner: _id
+        })
 
-    //we also need to check if the comment being updated was writtend by the same user or not- else any user can update any comment
-    if(Comment?.owner.toString() !== _id.toString()){
-        throw new apiError(403, "You are not authorized to update this comment")
-    }
+        if(!comment){
+            throw new apiError(500, "Error while adding comment");
+        }
 
-    //don't need to check if user exists or not ;as it is done by the middleware
+        return res.status(201).json(new apiResponse(201, comment, "Comment added successfully"));
 
-    const comment = await Comment.findByIdAndUpdate(commentId, {
-        content: newContent
-    },{new :true})
+    })
 
-    if(!comment){
-        throw new apiError(500, "Error while updating comment")
-    }
+    const updateComment = asyncHandler(async (req, res) => {
+        const {commentId} = req.params;
+        const {videoId} = req.params;
+        const {_id} = req.user;
+        const {newContent} = req.body;
 
-    return res.status(200).json(new apiResponse(200, comment , "Comment updated successfully"))
+        if(!mongoose.isValidObjectId(commentId) || !commentId){
+            throw new apiError(400, "Invalid comment id")
+        }
 
-})
+        const Comment = await Comment.findById(commentId)
+        if(!Comment){
+            throw new apiError(404,"Comment dosen't exists.")
+        }
 
-const deleteComment = asyncHandler(async (req, res) => {
-    // TODO: delete a comment
-})
+        if(!(await Video.findById(videoId) ) ){
+            throw new apiError(404,"Video dosen't exists, Sorry")
+        }
 
-export {
-    getVideoComments, 
-    addComment, 
-    updateComment,
-     deleteComment
-    }
+        //we also need to check if the comment being updated was writtend by the same user or not- else any user can update any comment
+        if(Comment?.owner.toString() !== _id.toString()){
+            throw new apiError(403, "You are not authorized to update this comment")
+        }
+
+        //don't need to check if user exists or not ;as it is done by the middleware
+
+        const comment = await Comment.findByIdAndUpdate(commentId, {
+            content: newContent
+        },{new :true})
+
+        if(!comment){
+            throw new apiError(500, "Error while updating comment")
+        }
+
+        return res.status(200).json(new apiResponse(200, comment , "Comment updated successfully"))
+
+    })
+
+    const deleteComment = asyncHandler(async (req, res) => { const {commentId} = req.params;
+    
+
+        if(!mongoose.isValidObjectId(commentId) || !commentId){
+            throw new apiError(400, "Invalid comment id")
+        }
+        const comment = await Comment.findById(commentId);
+
+        if(!comment){
+            throw new apiError(404, "Comment not found")
+        }
+
+        if(comment?.owner.toString() !== req.user?._id.toString()){
+            throw new apiError(403, "You are not authorized to delete this comment")
+        }
+        
+        const deletedComment = await Comment.findOneAndDelete({
+            _id: commentId,
+            owner: req.user?._id
+        })
+
+        if(!deletedComment){
+            throw new apiError(500, "Error while deleting comment, Please try again")
+        }
+
+        return res
+        .status(200)
+        .json(new apiResponse(200, {}, "Comment deleted successfully"))
+        
+    })
+
+    export {
+        getVideoComments, 
+        addComment, 
+        updateComment,
+        deleteComment
+        }
