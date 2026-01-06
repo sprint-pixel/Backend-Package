@@ -1,30 +1,24 @@
 import { Router } from 'express';
 import {
-    addVideoToPlaylist,
-    createPlaylist,
-    deletePlaylist,
-    getPlaylistById,
-    getUserPlaylists,
-    removeVideoFromPlaylist,
-    updatePlaylist,
-} from "../controllers/playlist.controller.js"
-import {verifyJWT} from "../middlewares/auth.middleware.js"
+    createTweet,
+    deleteTweet,
+    getUserTweets,
+    updateTweet,
+} from "../controllers/tweet.controller.js";
+import { verifyJWT } from "../middlewares/auth.middleware.js";
+import checkValidObjectId from '../middlewares/validateObjectId.middleware.js';
 
 const router = Router();
 
-router.use(verifyJWT); // Protect all routes below
+// Apply verifyJWT middleware to all routes in this file
+router.use(verifyJWT); 
 
-router.route("/").post(createPlaylist)
+router.route("/").post(createTweet);
+router.route("/user/:userId")
+    .get(checkValidObjectId(['userId']), getUserTweets);
 
-router
-    .route("/:playlistId")
-    .get(getPlaylistById)
-    .patch(updatePlaylist)
-    .delete(deletePlaylist);
+router.route("/:tweetId")
+    .patch(checkValidObjectId(['tweetId']), updateTweet)
+    .delete(checkValidObjectId(['tweetId']), deleteTweet);
 
-router.route("/add/:videoId/:playlistId").patch(addVideoToPlaylist);
-router.route("/remove/:videoId/:playlistId").patch(removeVideoFromPlaylist);
-
-router.route("/user/:userId").get(getUserPlaylists);
-
-export default router
+export default router;
