@@ -1,5 +1,4 @@
 import mongoose, {isValidObjectId} from "mongoose"
-import {User} from "../models/user.model.js"
 import { Subscription } from "../models/subscription.model.js"
 import {apiError} from "../utils/apiError.js"
 import {apiResponse} from "../utils/apiResponse.js"
@@ -49,10 +48,11 @@ const toggleSubscription = asyncHandler(async (req, res) => {
     // TODO: toggle subscription
 })
 
+
 // controller to return subscriber list of a channel
 const getUserChannelSubscribers = asyncHandler(async (req, res) => {
     const {channelId} = req.params;
-    const {page = 1,limit =10} = req.querry;
+    const {page = 1,limit =10} = req.query;
     const subscriberList = Subscription.aggregate([
     {
         $match:{
@@ -80,8 +80,20 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
         $unwind:"$userDetails"
     },
     {
+            //flatening the output for a cleaner API response
+            $project:{
+                _id:0, //too many id's that the frontend don't need, so we exclude it
+                channelId:"$userDetails._id",
+                fullName: "$userDetails.fullName",
+                username: "$userDetails.username",
+                avatar: "$userDetails.avatar",
+                subscribedAt: "$createdAt"
+            }
+
+        },
+    {
         $sort:{
-            createdAt:-1
+            subscribedAt:-1
         }
     }
     ])
@@ -95,3 +107,66 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
 
     return res.status(200).json(new apiResponse(200,result,"Successfully fetched subscriber lists."))
 })
+   
+// controller to return channel list to which user has subscribed
+const getSubscribedChannels = asyncHandler(async (req, res) => {
+    const { subscriberId } = req.params
+    const {limit =10,page =1} = req.query
+
+    const subscribedChannel = Subscription.aggregate([
+        {
+        $match:{
+            subscriber:new mongoose.Types.ObjectId(subscriberId)
+            }
+        },
+        {
+            $lookup:{
+                from:"users",
+                localField:"channel",
+                foreignField:"_id",
+                as:"subscribedUserDetails",
+                pipeline:[
+                    {
+                        $project:{
+                            fullName:1,
+                            avatar:1,
+                            username:1
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            $unwind:"$subscribedUserDetails"
+        },
+        {
+            //flatening the output for a cleaner API response
+            $project:{
+                _id:0, //too many id's that the frontend don't need, so we exclude it
+                channelId:"$subscribedUserDetails._id",
+                fullName: "$subscribedUserDetails.fullName",
+                username: "$subscribedUserDetails.username",
+                avatar: "$subscribedUserDetails.avatar",
+                subscribedAt: "$createdAt"
+            }
+        },
+        {
+            $sort:{"subscribedAt":-1}
+        }
+    ])
+
+    const options = {
+        limit : parseInt(limit),
+        page: parseInt(page)
+    }
+
+    const paginatedSubscribedList = await Subscription.aggregatePaginate(subscribedChannel,options)
+
+    return res.status(200).json(new apiResponse(200,paginatedSubscribedList,"Successfully fetched subscribed channels"))
+})
+
+export {
+    toggleSubscription,
+    getUserChannelSubscribers,
+    getSubscribedChannels
+}
