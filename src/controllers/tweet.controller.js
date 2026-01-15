@@ -30,7 +30,7 @@ const createTweet = asyncHandler(async (req, res) => {
     //TODO: create tweet
 })
 
-const getUserTweets = asyncHandler(async (req, res) => { //was confused on whether this controller function should fetch User's own tweets or someone else's tweet cause if it was my own tweet seeing functionality I could have got the _id of the user by `req.user` but since we have `userId` in the params we will have to fetch the _id using the req.params method.
+const getUserTweets = asyncHandler(async (req, res) => { //was confused on whether this controller function should fetch User's own tweets or someone else's tweet cause if it was my own tweet seeing functionality I could have got the _id of the user by `req.user` but since we have `userId` in the routes we will have to fetch the _id using the req.params method.
     const {userId} = req.params;
     const {limit=10, page=1} = req.query;
 
@@ -80,6 +80,58 @@ return res.status(200).json(new apiResponse(200,paginatedUsertweets,"Successfull
     // TODO: get user tweets
 })
 
-return{ 
-    createTweet, 
-    getUserTweets}
+const updateTweet = asyncHandler(async (req, res) => {
+    const {tweetId} = req.params;
+    const {content} = req.body;
+    const userId = req.user?._id;
+
+
+    if(!content || content.trim() === ""){
+        throw new ApiError(400, "Content is required.")
+    }
+
+    const editTweet = await Tweet.findOneAndUpdate({
+        _id: new mongoose.Types.ObjectId(tweetId),
+        owner: new mongoose.Types.ObjectId(userId)
+    },
+    {
+        $set:{
+            content: content.trim()
+        }
+    },
+    {
+        new:true
+    }
+    )
+
+    if(!editTweet){
+        throw new ApiError(404, "Tweet not found or You're not the authorized to edit it.")
+    }
+
+    return res.status(200).json(new ApiResponse(200,editTweet,"Successfully updated tweet."))
+    //TODO: update tweet
+})
+
+const deleteTweet = asyncHandler(async (req, res) => {
+    const {tweetId} = req.params;
+    const userId = req.user?._id;
+
+    const deletedTweet = await Tweet.findOneAndDelete({
+        _id: new mongoose.Types.ObjectId(tweetId),
+        owner: new mongoose.Types.ObjectId(userId)
+    })
+     
+    if(!deletedTweet){
+        throw new ApiError(404,"Tweet not found or you're not authorized to delete it.")
+    }
+    return res.status(200).json(new ApiResponse(200,{},"Successfully deleted."))
+
+    //TODO: delete tweet
+})
+
+export {
+    createTweet,
+    getUserTweets,
+    updateTweet,
+    deleteTweet
+}
